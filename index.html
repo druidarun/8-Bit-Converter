@@ -3,98 +3,94 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#08121b" />
   <title>Retro8 Video Converter</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="shell">
-    <section class="hero">
+  <main class="app">
+    <header>
       <div class="badge">RETRO8</div>
-      <h1>Turn any video into an <span>8-bit world.</span></h1>
-      <p>Pixelated video, limited colours and crunchy retro sound — processed privately in your browser.</p>
-    </section>
+      <h1>8-Bit Video Converter</h1>
+      <p>Turn a normal video into a pixel-art retro video with crunchy 8-bit-style sound. Everything runs on your device.</p>
+    </header>
 
     <section class="card">
       <label class="drop" id="drop">
-        <input id="video" type="file" accept="video/*" hidden />
-        <div class="upload-icon">▣</div>
+        <input id="video" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" />
+        <span class="uploadIcon">⬆</span>
         <strong id="fileLabel">Choose a video</strong>
-        <small>MP4, MOV, WebM and other formats supported by the browser FFmpeg engine</small>
+        <span id="fileMeta">MP4 / MOV / WebM • processed locally</span>
       </label>
 
-      <div class="file-meta hidden" id="fileMeta"></div>
-
-      <div class="preview-wrap hidden" id="previewWrap">
+      <div id="previewWrap" class="preview hidden">
         <video id="preview" controls playsinline></video>
       </div>
 
       <div class="grid">
         <label>Style
           <select id="preset">
-            <option value="nes">NES Style</option>
-            <option value="gameboy">Game Boy Style</option>
             <option value="arcade">Arcade</option>
+            <option value="nes">NES</option>
+            <option value="gameboy">Game Boy</option>
             <option value="extreme">Extreme Pixel</option>
           </select>
         </label>
 
         <label>Pixel size
           <select id="pixelSize">
-            <option>4</option><option selected>8</option><option>12</option><option>16</option><option>24</option>
+            <option>4</option><option selected>6</option><option>8</option><option>12</option><option>16</option><option>24</option>
           </select>
         </label>
 
-        <label>Colours
+        <label>Colour levels
           <select id="colors">
-            <option>8</option><option>16</option><option selected>32</option><option>64</option><option>128</option>
+            <option value="4">4</option><option value="8">8</option><option value="16">16</option>
+            <option value="32">32</option><option value="64" selected>64</option><option value="128">128</option>
           </select>
         </label>
 
         <label>Frame rate
           <select id="fps">
-            <option>10</option><option selected>15</option><option>20</option><option>24</option><option>30</option>
+            <option>10</option><option>12</option><option>15</option><option selected>20</option><option>24</option><option>30</option>
           </select>
         </label>
 
         <label>Audio style
           <select id="audioMode">
-            <option value="retro">Crunchy 8-bit</option>
-            <option value="clean8">Clean low-fi</option>
-            <option value="original">Keep original character</option>
+            <option value="retro" selected>Crunchy 8-bit</option>
+            <option value="clean8">Clean 8-bit</option>
+            <option value="original">Original-ish</option>
           </select>
         </label>
 
-        <label>Audio sample rate
+        <label>Audio character
           <select id="audioRate">
-            <option value="8000">8 kHz</option>
-            <option value="11025" selected>11.025 kHz</option>
-            <option value="16000">16 kHz</option>
-            <option value="22050">22.05 kHz</option>
+            <option value="8000">8 kHz feel</option>
+            <option value="11025">11 kHz feel</option>
+            <option value="16000" selected>16 kHz feel</option>
+            <option value="22050">22 kHz feel</option>
           </select>
         </label>
       </div>
 
       <button id="convert">CONVERT TO 8-BIT</button>
 
-      <div class="status hidden" id="status">
-        <div class="status-row">
-          <div class="spinner" id="spinner"></div>
-          <span id="statusText">Preparing…</span>
-          <span id="percent">0%</span>
-        </div>
-        <div class="progress"><div id="progressBar"></div></div>
+      <div id="status" class="status hidden">
+        <div class="row"><span id="statusText">Preparing…</span><span id="percent">0%</span></div>
+        <div class="bar"><div id="progressBar"></div></div>
+        <small>This browser-native version converts in real time, so a 30-second video takes about 30 seconds.</small>
       </div>
 
-      <div class="result hidden" id="result">
+      <section id="result" class="result hidden">
+        <h2>Finished</h2>
         <video id="resultPreview" controls playsinline></video>
-        <a class="download" id="download">DOWNLOAD 8-BIT VIDEO</a>
-      </div>
+        <a id="download" class="download" download="retro8-video.webm">DOWNLOAD RETRO VIDEO</a>
+        <small>The browser-native export is WebM for maximum Android compatibility.</small>
+      </section>
     </section>
 
-    <p class="foot"><strong>Private processing:</strong> your video is not uploaded to our server. Conversion happens on your device. Large/4K videos may take longer or use substantial memory.</p>
+    <canvas id="canvas" class="hiddenCanvas"></canvas>
   </main>
-
   <script src="app.js"></script>
 </body>
 </html>

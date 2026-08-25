@@ -1,14 +1,12 @@
-# Retro8 Video Converter — GitHub Pages build
+# Retro8 Browser-Native Converter
 
-Browser-only 8-bit style video converter. No backend is required.
+This build removes FFmpeg.wasm entirely.
 
-## Fix in this build
-- Replaced the failing ffmpeg.wasm 0.12 UMD loader with a mobile-friendly 0.11.6 loader.
-- Uses the single-thread FFmpeg core, which does not require SharedArrayBuffer/cross-origin isolation.
-- Tries jsDelivr first and unpkg as a fallback.
-- Keeps processing on the user's device.
+It uses:
+- Canvas for pixel-art video processing
+- Web Audio API for 8-bit-style audio quantization
+- MediaRecorder for local WebM export
 
-## GitHub Pages
-Deploy the `main` branch from `/ (root)`.
+No backend, no Render, and no external video-processing library are required.
 
-For best results on mobile, test first with a short MP4 clip (5–10 seconds).
+For best results use a recent Chrome or Edge browser. Conversion runs approximately in real time.
