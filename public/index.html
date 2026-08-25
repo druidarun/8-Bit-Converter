@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Retro8 Video Converter</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="badge">RETRO8</div>
+      <h1>Turn any video into an <span>8-bit world.</span></h1>
+      <p>Pixelated video, limited colours and lo-fi 8-bit-style sound — exported as a normal MP4.</p>
+    </section>
+
+    <section class="card">
+      <label class="drop" id="drop">
+        <input id="video" type="file" accept="video/*" hidden />
+        <div class="upload-icon">▣</div>
+        <strong id="fileLabel">Choose a video</strong>
+        <small>MP4, MOV, MKV, WebM and most formats supported by FFmpeg</small>
+      </label>
+
+      <div class="preview-wrap hidden" id="previewWrap">
+        <video id="preview" controls playsinline></video>
+      </div>
+
+      <div class="grid">
+        <label>Style
+          <select id="preset">
+            <option value="nes">NES Style</option>
+            <option value="gameboy">Game Boy Style</option>
+            <option value="arcade">Arcade</option>
+            <option value="extreme">Extreme Pixel</option>
+          </select>
+        </label>
+
+        <label>Pixel size
+          <select id="pixelSize">
+            <option>4</option><option selected>8</option><option>12</option><option>16</option><option>24</option>
+          </select>
+        </label>
+
+        <label>Colours
+          <select id="colors">
+            <option>8</option><option>16</option><option selected>32</option><option>64</option><option>128</option>
+          </select>
+        </label>
+
+        <label>Frame rate
+          <select id="fps">
+            <option>10</option><option selected>15</option><option>20</option><option>24</option><option>30</option>
+          </select>
+        </label>
+
+        <label>Audio
+          <select id="audioMode">
+            <option value="retro">Retro 8-bit</option>
+            <option value="clean8">Clean low-bit</option>
+          </select>
+        </label>
+
+        <label>Audio sample rate
+          <select id="audioRate">
+            <option value="8000">8 kHz</option>
+            <option value="11025" selected>11.025 kHz</option>
+            <option value="16000">16 kHz</option>
+            <option value="22050">22.05 kHz</option>
+          </select>
+        </label>
+      </div>
+
+      <button id="convert">CONVERT TO 8-BIT</button>
+      <div class="status hidden" id="status">
+        <div class="spinner"></div><span id="statusText">Converting…</span>
+      </div>
+      <a class="download hidden" id="download">DOWNLOAD 8-BIT VIDEO</a>
+    </section>
+
+    <p class="foot">Your uploaded file is automatically removed after processing.</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

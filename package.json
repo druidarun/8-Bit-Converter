@@ -1,0 +1,17 @@
+{
+  "name": "retro8-video-converter",
+  "version": "1.0.0",
+  "description": "Convert videos to retro 8-bit style with lo-fi audio",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.1"
+  }
+}
