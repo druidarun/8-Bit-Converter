@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: retro8-video-converter
-    runtime: docker
-    plan: starter
-    healthCheckPath: /api/health
-    autoDeploy: true
