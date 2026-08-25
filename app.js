@@ -50,6 +50,9 @@ drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag'
 
 const presets={
   arcade:{pixelSize:'6',colors:'64',fps:'20',audioMode:'retro',audioRate:'16000'},
+  retroaction:{pixelSize:'5',colors:'32',fps:'20',audioMode:'retro',audioRate:'16000'},
+  comicpixel:{pixelSize:'4',colors:'48',fps:'20',audioMode:'retro',audioRate:'16000'},
+  goldenbattle:{pixelSize:'6',colors:'24',fps:'18',audioMode:'retro',audioRate:'11025'},
   nes:{pixelSize:'8',colors:'32',fps:'15',audioMode:'retro',audioRate:'11025'},
   gameboy:{pixelSize:'12',colors:'8',fps:'15',audioMode:'clean8',audioRate:'8000'},
   extreme:{pixelSize:'24',colors:'8',fps:'10',audioMode:'retro',audioRate:'8000'}
@@ -95,23 +98,107 @@ function drawRetro(source,w,h,pixelSize,colors,preset){
   const d=img.data;
   const levels=Math.max(2,Math.round(Math.cbrt(colors)));
   const step=255/(levels-1);
+
+  function clamp(x){ return Math.max(0,Math.min(255,x)); }
+  function q(x,s=step){ return Math.round(clamp(x)/s)*s; }
+
   for(let i=0;i<d.length;i+=4){
     let r=d[i],g=d[i+1],b=d[i+2];
+    const lum=.299*r+.587*g+.114*b;
+
     if(preset==='gameboy'){
+      const qv=Math.round(lum/85)*85;
+      r=qv*.55; g=qv*.75; b=qv*.45;
+    } else if(preset==='retroaction'){
+      // Warm, high-contrast cinematic pixel look:
+      // crush shadows, lift golds, mute cool colors, posterize hard.
+      const contrast=1.45;
+      r=(r-128)*contrast+128;
+      g=(g-128)*contrast+128;
+      b=(b-128)*contrast+128;
+
+      // Warm grade
+      r=r*1.18+18;
+      g=g*1.02+5;
+      b=b*.72-8;
+
+      // Push bright regions toward yellow/gold
+      if(lum>145){ r+=24; g+=15; b-=12; }
+      if(lum<72){ r*=.58; g*=.48; b*=.42; }
+
+      // Coarse palette
+      const s=42;
+      r=q(r,s); g=q(g,s); b=q(b,s);
+
+    } else if(preset==='comicpixel'){
+      const contrast=1.55;
+      r=(r-128)*contrast+128;
+      g=(g-128)*contrast+128;
+      b=(b-128)*contrast+128;
+
+      const sat=1.45;
       const y=.299*r+.587*g+.114*b;
-      const q=Math.round(y/85)*85;
-      r=q*.55; g=q*.75; b=q*.45;
-    }else{
+      r=y+(r-y)*sat; g=y+(g-y)*sat; b=y+(b-y)*sat;
+
+      // Ink-like shadow crush
+      if(y<78){ r*=.38; g*=.38; b*=.38; }
+      r=q(r,34); g=q(g,34); b=q(b,34);
+
+    } else if(preset==='goldenbattle'){
+      // Restrained amber/brown battlefield palette
+      const y=lum;
+      r=y*1.18+34;
+      g=y*.82+20;
+      b=y*.40+5;
+
+      if(y<80){ r*=.62; g*=.52; b*=.45; }
+      if(y>175){ r+=22; g+=15; }
+      r=q(r,38); g=q(g,38); b=q(b,38);
+
+    } else {
       const sat=preset==='arcade'?1.25:(preset==='extreme'?1.1:1.0);
       const y=.299*r+.587*g+.114*b;
       r=y+(r-y)*sat; g=y+(g-y)*sat; b=y+(b-y)*sat;
-      r=Math.round(Math.max(0,Math.min(255,r))/step)*step;
-      g=Math.round(Math.max(0,Math.min(255,g))/step)*step;
-      b=Math.round(Math.max(0,Math.min(255,b))/step)*step;
+      r=q(r); g=q(g); b=q(b);
     }
-    d[i]=r;d[i+1]=g;d[i+2]=b;
+
+    // Lightweight ordered dithering for cinematic presets.
+    if(preset==='retroaction'||preset==='comicpixel'||preset==='goldenbattle'){
+      const px=(i/4)%sw;
+      const py=Math.floor((i/4)/sw);
+      const matrix=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+      const threshold=(matrix[py%4][px%4]-7.5)*2.2;
+      r=clamp(r+threshold); g=clamp(g+threshold); b=clamp(b+threshold);
+    }
+
+    d[i]=r; d[i+1]=g; d[i+2]=b;
   }
+
   o.putImageData(img,0,0);
+
+  // Simple dark edge pass for the cinematic/comic presets.
+  if(preset==='retroaction'||preset==='comicpixel'||preset==='goldenbattle'){
+    const base=o.getImageData(0,0,sw,sh);
+    const out=new ImageData(new Uint8ClampedArray(base.data),sw,sh);
+    const bd=base.data, od=out.data;
+    for(let y=1;y<sh-1;y++){
+      for(let x=1;x<sw-1;x++){
+        const idx=(y*sw+x)*4;
+        const l0=.299*bd[idx]+.587*bd[idx+1]+.114*bd[idx+2];
+        const ir=(y*sw+x+1)*4;
+        const id=((y+1)*sw+x)*4;
+        const lr=.299*bd[ir]+.587*bd[ir+1]+.114*bd[ir+2];
+        const ld=.299*bd[id]+.587*bd[id+1]+.114*bd[id+2];
+        const edge=Math.abs(l0-lr)+Math.abs(l0-ld);
+        if(edge>(preset==='comicpixel'?48:62)){
+          const strength=preset==='comicpixel'?.38:.55;
+          od[idx]*=strength; od[idx+1]*=strength; od[idx+2]*=strength;
+        }
+      }
+    }
+    o.putImageData(out,0,0);
+  }
+
   ctx.imageSmoothingEnabled=false;
   ctx.drawImage(off,0,0,sw,sh,0,0,w,h);
 }

@@ -10,3 +10,9 @@ It uses:
 No backend, no Render, and no external video-processing library are required.
 
 For best results use a recent Chrome or Edge browser. Conversion runs approximately in real time.
+
+
+## Added cinematic pixel themes
+- Retro Action / 16-bit Cinematic
+- Comic Pixel
+- Golden Battlefield
