@@ -19,6 +19,7 @@ let inputURL = null;
 let resultURL = null;
 let ffmpeg = null;
 let engineLoaded = false;
+let fetchFileFn = null;
 
 function formatBytes(bytes) {
   const units = ['B','KB','MB','GB'];
@@ -40,7 +41,6 @@ function selectFile(file) {
     alert('Please choose a video file.');
     return;
   }
-  videoInput.files = makeFileList(file);
   fileLabel.textContent = file.name;
   fileMeta.textContent = `${formatBytes(file.size)} • processed locally on this device`;
   fileMeta.classList.remove('hidden');
@@ -52,20 +52,14 @@ function selectFile(file) {
   setProgress(0, 'Ready.');
 }
 
-function makeFileList(file) {
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  return dt.files;
-}
-
 videoInput.addEventListener('change', () => selectFile(videoInput.files[0]));
-
 drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
 drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
 drop.addEventListener('drop', (e) => {
   e.preventDefault();
   drop.classList.remove('drag');
-  selectFile(e.dataTransfer.files[0]);
+  const file = e.dataTransfer?.files?.[0];
+  if (file) selectFile(file);
 });
 
 const presetValues = {
@@ -80,28 +74,87 @@ $('preset').addEventListener('change', (e) => {
   Object.entries(p).forEach(([id, value]) => $(id).value = value);
 });
 
+function loadScript(src, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      s.remove();
+      reject(new Error(`Timed out loading ${src}`));
+    }, timeoutMs);
+    s.src = src;
+    s.async = true;
+    s.crossOrigin = 'anonymous';
+    s.onload = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    s.onerror = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      s.remove();
+      reject(new Error(`Could not load ${src}`));
+    };
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureLegacyFFmpegLibrary() {
+  if (window.FFmpeg?.createFFmpeg) return;
+  const candidates = [
+    'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js',
+    'https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js'
+  ];
+  let lastError;
+  for (const src of candidates) {
+    try {
+      await loadScript(src);
+      if (window.FFmpeg?.createFFmpeg) return;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw new Error('FFmpeg could not be loaded in this browser. Please use an up-to-date Chrome or Edge browser and reload the page.');
+}
+
 async function loadEngine() {
   if (engineLoaded) return;
-  if (!window.FFmpegWASM || !window.FFmpegUtil) {
-    throw new Error('The browser FFmpeg library could not be loaded. Check your internet connection and refresh the page.');
+  setProgress(2, 'Loading the video engine…');
+  await ensureLegacyFFmpegLibrary();
+
+  const { createFFmpeg, fetchFile } = window.FFmpeg;
+  fetchFileFn = fetchFile;
+  const coreCandidates = [
+    'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+    'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+  ];
+
+  let lastError;
+  for (const corePath of coreCandidates) {
+    try {
+      ffmpeg = createFFmpeg({
+        log: false,
+        corePath,
+        progress: ({ ratio }) => {
+          if (Number.isFinite(ratio)) setProgress(10 + ratio * 84, 'Converting video on your device…');
+        }
+      });
+      await ffmpeg.load();
+      engineLoaded = true;
+      setProgress(8, 'Video engine ready.');
+      return;
+    } catch (e) {
+      lastError = e;
+      ffmpeg = null;
+    }
   }
-
-  setProgress(2, 'Loading video engine for the first time…');
-  const { FFmpeg } = FFmpegWASM;
-  const { toBlobURL } = FFmpegUtil;
-  ffmpeg = new FFmpeg();
-
-  ffmpeg.on('progress', ({ progress }) => {
-    if (Number.isFinite(progress)) setProgress(10 + progress * 85, 'Converting video on your device…');
-  });
-
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-  });
-  engineLoaded = true;
-  setProgress(8, 'Video engine ready.');
+  console.error(lastError);
+  throw new Error('The FFmpeg engine could not start. Check your internet connection, then reload the page.');
 }
 
 function buildVideoFilter(pixelSize, colors, fps, preset) {
@@ -110,31 +163,36 @@ function buildVideoFilter(pixelSize, colors, fps, preset) {
   if (preset === 'gameboy') style = 'eq=contrast=1.12:saturation=0.25';
   if (preset === 'extreme') style = 'eq=contrast=1.25:saturation=1.15';
 
-  return [
-    `fps=${fps}`,
-    style,
-    `scale=max(2,trunc(iw/${pixelSize}/2)*2):max(2,trunc(ih/${pixelSize}/2)*2):flags=neighbor`,
-    `scale=iw*${pixelSize}:ih*${pixelSize}:flags=neighbor`,
-    'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-    'split[v1][v2]',
-    `[v1]palettegen=max_colors=${colors}:stats_mode=diff[p]`,
-    '[v2][p]paletteuse=dither=bayer:bayer_scale=4'
-  ].join(',').replace(',[v1]', ';[v1]');
+  const down = `scale=max(2,trunc(iw/${pixelSize}/2)*2):max(2,trunc(ih/${pixelSize}/2)*2):flags=neighbor`;
+  const up = `scale=iw*${pixelSize}:ih*${pixelSize}:flags=neighbor`;
+  return `[0:v]fps=${fps},${style},${down},${up},scale=trunc(iw/2)*2:trunc(ih/2)*2,split[v1][v2];` +
+         `[v1]palettegen=max_colors=${colors}:stats_mode=diff[p];` +
+         `[v2][p]paletteuse=dither=bayer:bayer_scale=4[v]`;
 }
 
 function buildAudioFilter(mode, rate) {
   if (mode === 'original') return `aresample=${rate}`;
-  if (mode === 'clean8') return `aresample=${rate},aformat=sample_fmts=u8:channel_layouts=mono,aresample=${rate}`;
-  return `aresample=${rate},aformat=sample_fmts=u8:channel_layouts=mono,acrusher=bits=8:mode=lin:aa=1,lowpass=f=4200,aresample=${rate}`;
+  if (mode === 'clean8') return `aresample=${rate},aformat=sample_fmts=u8:channel_layouts=mono`;
+  // "8-bit" character without relying on optional acrusher builds.
+  return `aresample=${rate},aformat=sample_fmts=u8:channel_layouts=mono,lowpass=f=4200`;
 }
 
-async function safeDelete(name) {
-  try { await ffmpeg.deleteFile(name); } catch (_) {}
+function safeUnlink(name) {
+  if (!ffmpeg) return;
+  try { ffmpeg.FS('unlink', name); } catch (_) {}
+}
+
+async function runFFmpeg(args) {
+  await ffmpeg.run(...args);
 }
 
 convertBtn.addEventListener('click', async () => {
   const file = videoInput.files[0];
   if (!file) { alert('Choose a video first.'); return; }
+  if (file.size > 350 * 1024 * 1024) {
+    const ok = confirm('This video is quite large for browser conversion and may run out of memory. Continue anyway?');
+    if (!ok) return;
+  }
 
   convertBtn.disabled = true;
   status.classList.remove('hidden');
@@ -148,11 +206,10 @@ convertBtn.addEventListener('click', async () => {
 
   try {
     await loadEngine();
-    const { fetchFile } = FFmpegUtil;
-    await safeDelete(inputName);
-    await safeDelete(outputName);
+    safeUnlink(inputName);
+    safeUnlink(outputName);
     setProgress(9, 'Reading your video…');
-    await ffmpeg.writeFile(inputName, await fetchFile(file));
+    ffmpeg.FS('writeFile', inputName, await fetchFileFn(file));
 
     const pixelSize = Number($('pixelSize').value);
     const colors = Number($('colors').value);
@@ -160,36 +217,38 @@ convertBtn.addEventListener('click', async () => {
     const preset = $('preset').value;
     const audioMode = $('audioMode').value;
     const audioRate = Number($('audioRate').value);
-    const vf = buildVideoFilter(pixelSize, colors, fps, preset);
+    const filterGraph = buildVideoFilter(pixelSize, colors, fps, preset);
     const af = buildAudioFilter(audioMode, audioRate);
 
-    const argsWithAudio = [
-      '-i', inputName,
-      '-filter_complex', `[0:v]${vf}[v]`,
-      '-map', '[v]', '-map', '0:a?',
-      '-af', af,
+    const commonVideo = [
+      '-filter_complex', filterGraph,
+      '-map', '[v]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '25',
-      '-c:a', 'aac', '-b:a', '64k', '-ac', '1', '-ar', String(audioRate),
-      '-movflags', '+faststart', '-shortest', outputName
+      '-pix_fmt', 'yuv420p', '-movflags', '+faststart'
     ];
 
-    let code = await ffmpeg.exec(argsWithAudio);
-    if (code !== 0) {
-      await safeDelete(outputName);
-      setProgress(18, 'Retrying without audio processing…');
-      code = await ffmpeg.exec([
+    try {
+      await runFFmpeg([
         '-i', inputName,
-        '-filter_complex', `[0:v]${vf}[v]`,
-        '-map', '[v]', '-map', '0:a?',
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '25',
-        '-c:a', 'aac', '-b:a', '96k',
-        '-movflags', '+faststart', '-shortest', outputName
+        ...commonVideo,
+        '-map', '0:a?', '-af', af,
+        '-c:a', 'aac', '-b:a', '64k', '-ac', '1', '-ar', String(audioRate),
+        '-shortest', outputName
+      ]);
+    } catch (audioErr) {
+      console.warn('Audio processing retry:', audioErr);
+      safeUnlink(outputName);
+      setProgress(18, 'Retrying with simpler audio…');
+      await runFFmpeg([
+        '-i', inputName,
+        ...commonVideo,
+        '-map', '0:a?', '-c:a', 'aac', '-b:a', '96k',
+        '-shortest', outputName
       ]);
     }
-    if (code !== 0) throw new Error('FFmpeg could not convert this file. Try a shorter MP4/WebM clip or a smaller resolution.');
 
     setProgress(96, 'Preparing your download…');
-    const data = await ffmpeg.readFile(outputName);
+    const data = ffmpeg.FS('readFile', outputName);
     const blob = new Blob([data.buffer], { type: 'video/mp4' });
     if (resultURL) URL.revokeObjectURL(resultURL);
     resultURL = URL.createObjectURL(blob);
@@ -201,8 +260,8 @@ convertBtn.addEventListener('click', async () => {
     spinner.classList.add('done');
     setProgress(100, `Done — ${formatBytes(blob.size)}`);
 
-    await safeDelete(inputName);
-    await safeDelete(outputName);
+    safeUnlink(inputName);
+    safeUnlink(outputName);
   } catch (err) {
     console.error(err);
     setProgress(0, 'Conversion failed.');

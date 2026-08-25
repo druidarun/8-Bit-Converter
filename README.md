@@ -1,30 +1,14 @@
-# Retro8 Video Converter — Browser Edition
+# Retro8 Video Converter — GitHub Pages build
 
-A static web app that converts video to a retro pixel/8-bit style directly in the user's browser using FFmpeg WebAssembly.
+Browser-only 8-bit style video converter. No backend is required.
 
-## Why this version
+## Fix in this build
+- Replaced the failing ffmpeg.wasm 0.12 UMD loader with a mobile-friendly 0.11.6 loader.
+- Uses the single-thread FFmpeg core, which does not require SharedArrayBuffer/cross-origin isolation.
+- Tries jsDelivr first and unpkg as a fallback.
+- Keeps processing on the user's device.
 
-- No Node server required.
-- No Render/Docker deployment required.
-- Videos stay on the user's device instead of being uploaded to an app server.
-- Can be hosted with GitHub Pages or another static host.
+## GitHub Pages
+Deploy the `main` branch from `/ (root)`.
 
-## Files
-
-- `index.html`
-- `style.css`
-- `app.js`
-- `.nojekyll`
-
-## GitHub Pages deployment
-
-1. Put these files in the root of the repository.
-2. Commit and push them to the `main` branch.
-3. In GitHub, open **Settings → Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select `main` and `/ (root)`, then Save.
-6. Wait for GitHub Pages to publish the site.
-
-## Notes
-
-FFmpeg WebAssembly downloads its browser engine from a public CDN on first use. Conversion uses device CPU/RAM. Large 4K files may be slow or exceed mobile-browser memory; shorter clips and 720p/1080p inputs work better.
+For best results on mobile, test first with a short MP4 clip (5–10 seconds).
