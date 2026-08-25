@@ -16,3 +16,14 @@ For best results use a recent Chrome or Edge browser. Conversion runs approximat
 - Retro Action / 16-bit Cinematic
 - Comic Pixel
 - Golden Battlefield
+
+## Sunset Noir Pixel
+A fixed 16-colour orange/navy cinematic palette with:
+- deep navy shadows
+- burnt orange and gold mid-tones
+- pale yellow highlights
+- strong dark contours
+- ordered dithering
+- crisp nearest-neighbour pixel scaling
+
+This preset is designed to resemble the supplied orange/navy pixel-animation reference. Exact results vary with the lighting and colours of the source video.

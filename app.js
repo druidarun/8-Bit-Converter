@@ -51,6 +51,7 @@ drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag'
 const presets={
   arcade:{pixelSize:'6',colors:'64',fps:'20',audioMode:'retro',audioRate:'16000'},
   retroaction:{pixelSize:'5',colors:'32',fps:'20',audioMode:'retro',audioRate:'16000'},
+  sunsetpixel:{pixelSize:'4',colors:'16',fps:'18',audioMode:'retro',audioRate:'11025'},
   comicpixel:{pixelSize:'4',colors:'48',fps:'20',audioMode:'retro',audioRate:'16000'},
   goldenbattle:{pixelSize:'6',colors:'24',fps:'18',audioMode:'retro',audioRate:'11025'},
   nes:{pixelSize:'8',colors:'32',fps:'15',audioMode:'retro',audioRate:'11025'},
@@ -109,6 +110,50 @@ function drawRetro(source,w,h,pixelSize,colors,preset){
     if(preset==='gameboy'){
       const qv=Math.round(lum/85)*85;
       r=qv*.55; g=qv*.75; b=qv*.45;
+    } else if(preset==='sunsetpixel'){
+      // Fixed orange/navy sunset palette inspired by classic cinematic pixel art.
+      const palette=[
+        [10,17,36],     // near-black navy
+        [23,31,58],     // dark navy
+        [47,52,79],     // slate indigo
+        [83,62,81],     // muted plum
+        [127,63,70],    // dark brick
+        [174,72,62],    // red-orange
+        [218,105,60],   // burnt orange
+        [239,133,65],   // orange
+        [246,165,76],   // light orange
+        [244,197,98],   // gold
+        [239,220,133],  // pale yellow
+        [214,225,170],  // warm cream
+        [73,103,111],   // muted teal-grey
+        [43,75,89],     // deep teal
+        [116,115,104],  // neutral dusk
+        [181,146,108]   // tan
+      ];
+
+      // Strong cinematic contrast before palette mapping.
+      let rr=(r-128)*1.35+128;
+      let gg=(g-128)*1.25+128;
+      let bb=(b-128)*1.18+128;
+
+      // Warm highlights / cooler shadows.
+      if(lum>145){ rr+=25; gg+=10; bb-=12; }
+      if(lum<95){ rr-=12; gg-=6; bb+=14; }
+
+      // Nearest-colour mapping to a fixed palette.
+      let best=palette[0], bestDist=Infinity;
+      for(const p of palette){
+        const dr=rr-p[0], dg=gg-p[1], db=bb-p[2];
+        // Slightly perceptual weighting.
+        const dist=dr*dr*0.30 + dg*dg*0.59 + db*db*0.11;
+        if(dist<bestDist){ bestDist=dist; best=p; }
+      }
+      r=best[0]; g=best[1]; b=best[2];
+
+      // Very dark contour bias for shadow regions.
+      if(lum<58){
+        r=10; g=17; b=36;
+      }
     } else if(preset==='retroaction'){
       // Warm, high-contrast cinematic pixel look:
       // crush shadows, lift golds, mute cool colors, posterize hard.
@@ -163,7 +208,7 @@ function drawRetro(source,w,h,pixelSize,colors,preset){
     }
 
     // Lightweight ordered dithering for cinematic presets.
-    if(preset==='retroaction'||preset==='comicpixel'||preset==='goldenbattle'){
+    if(preset==='sunsetpixel'||preset==='retroaction'||preset==='comicpixel'||preset==='goldenbattle'){
       const px=(i/4)%sw;
       const py=Math.floor((i/4)/sw);
       const matrix=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
@@ -177,7 +222,7 @@ function drawRetro(source,w,h,pixelSize,colors,preset){
   o.putImageData(img,0,0);
 
   // Simple dark edge pass for the cinematic/comic presets.
-  if(preset==='retroaction'||preset==='comicpixel'||preset==='goldenbattle'){
+  if(preset==='sunsetpixel'||preset==='retroaction'||preset==='comicpixel'||preset==='goldenbattle'){
     const base=o.getImageData(0,0,sw,sh);
     const out=new ImageData(new Uint8ClampedArray(base.data),sw,sh);
     const bd=base.data, od=out.data;
@@ -190,8 +235,8 @@ function drawRetro(source,w,h,pixelSize,colors,preset){
         const lr=.299*bd[ir]+.587*bd[ir+1]+.114*bd[ir+2];
         const ld=.299*bd[id]+.587*bd[id+1]+.114*bd[id+2];
         const edge=Math.abs(l0-lr)+Math.abs(l0-ld);
-        if(edge>(preset==='comicpixel'?48:62)){
-          const strength=preset==='comicpixel'?.38:.55;
+        if(edge>(preset==='comicpixel'?48:(preset==='sunsetpixel'?52:62))){
+          const strength=preset==='comicpixel'?.38:(preset==='sunsetpixel'?.42:.55);
           od[idx]*=strength; od[idx+1]*=strength; od[idx+2]*=strength;
         }
       }
